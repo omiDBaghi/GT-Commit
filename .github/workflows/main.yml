@@ -1,38 +1,52 @@
-name: Automated Commit
+name: Automated Random Commit
 
 on:
   schedule:
-    - cron: '0 */5 * * *'  
+    - cron: '0 8-22 * * *'
   workflow_dispatch:
 
 jobs:
-  build:
+  random-commit:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Git
       run: |
         git config --global user.email "omidbaghi@icloud.com"
         git config --global user.name "omiDBaghi"
 
-    - name: Select Random Sticker
-      id: random_sticker
+    - name: Random Decision (40% chance)
+      id: random_decision
       run: |
-        LINES=$(wc -l < stickers.txt)
-        RAND=$(( ( RANDOM % LINES ) + 1 ))
-        STICKER=$(sed -n "${RAND}p" stickers.txt)
+        RAND=$((RANDOM % 100))
+        if [ $RAND -lt 40 ]; then
+          echo "COMMIT=true" >> $GITHUB_ENV
+          HOUR=$((RANDOM % 15 + 9))
+          echo "RANDOM_HOUR=$HOUR" >> $GITHUB_ENV
+          echo "🎲 Today we will commit!"
+        else
+          echo "COMMIT=false" >> $GITHUB_ENV
+          echo "🎲 Today we skip"
+        fi
+
+    - name: Select Random Sticker
+      if: env.COMMIT == 'true'
+      run: |
+        if [ ! -f stickers.txt ]; then
+          echo -e "❤️\n🎉\n✨\n🚀\n🌟\n💡\n🔥\n🍀\n⭐" > stickers.txt
+        fi
+        STICKER=$(shuf -n 1 stickers.txt)
         echo "STICKER=$STICKER" >> $GITHUB_ENV
 
-    - name: Pull latest changes
+    - name: Make the Commit
+      if: env.COMMIT == 'true'
       run: |
-        git pull origin main --rebase
-
-    - name: Make a commit
-      run: |
-        echo "Commit made at $(date) with sticker: ${{ env.STICKER }}" >> commit-log.txt
+        echo "$(date '+%Y-%m-%d %H:%M:%S') → ${{ env.STICKER }}" >> commit-log.txt
+        
         git add commit-log.txt
-        git commit -m "For You: ${{ env.STICKER }}"
+        git commit -m "For You: ${{ env.STICKER }} at ~${{ env.RANDOM_HOUR }}:00"
         git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}.git HEAD:main
+        echo "✅ Commit successful!"
